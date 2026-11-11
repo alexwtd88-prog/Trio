@@ -166,6 +166,7 @@ extension PluginSource: CGMManagerDelegate {
             switch self.readCGMResult(readingResult: readingResult) {
             case let .success(glucose):
                 self.glucoseManager?.newGlucoseFromCgmManager(newGlucose: glucose)
+                self.recordSensorHistory()
             case .failure:
                 debug(.deviceManager, "CGM PLUGIN - unable to read CGM result")
             }
@@ -192,6 +193,12 @@ extension PluginSource: CGMManagerDelegate {
                 if event.type == .sensorStart {
                     self.glucoseManager?.removeCalibrations()
                     self.glucoseManager?.startCGMSensorSession(startedAt: event.date)
+                    SensorHistoryStore.shared.observe(
+                        sensorName: event.deviceIdentifier,
+                        sensorType: self.sensorHistoryTypeName(sensorName: event.deviceIdentifier),
+                        activatedAt: event.date,
+                        expectedLifetime: event.expectedLifetime
+                    )
                 }
             }
         }
@@ -245,6 +252,42 @@ extension PluginSource: CGMManagerDelegate {
                 self.cgmHasValidSensorSession = status.hasValidSensorSession
             }
         }
+    }
+
+    // MARK: - Sensor History (record-keeping only; never affects glucose handling or dosing)
+
+    private func sensorHistoryTypeName(sensorName: String?) -> String {
+        if cgmManager is G7CGMManager {
+            return (sensorName?.hasPrefix("DX02") ?? false) ? "Dexcom ONE+" : "Dexcom G7"
+        }
+        return cgmManager?.localizedTitle ?? "CGM"
+    }
+
+    private func recordSensorHistory() {
+        var sensorName: String?
+        var activatedAt: Date?
+        var expectedLifetime: TimeInterval?
+
+        if let manager = cgmManager as? G7CGMManager {
+            sensorName = manager.sensorName
+            activatedAt = manager.sensorActivatedAt
+            if let activatedAt = activatedAt, let endsAt = manager.sensorEndsAt {
+                expectedLifetime = endsAt.timeIntervalSince(activatedAt)
+            }
+        } else if let manager = cgmManager as? TransmitterManager {
+            // G5 / G6: the only Bluetooth ID is the transmitter's; sessions distinguish sensors.
+            sensorName = manager.latestReading?.transmitterID
+            activatedAt = manager.latestReading?.sessionStartDate
+        } else {
+            return
+        }
+
+        SensorHistoryStore.shared.observe(
+            sensorName: sensorName,
+            sensorType: sensorHistoryTypeName(sensorName: sensorName),
+            activatedAt: activatedAt,
+            expectedLifetime: expectedLifetime
+        )
     }
 
     // The live reading carries the sensor state; a backfill's .newData says nothing about it.

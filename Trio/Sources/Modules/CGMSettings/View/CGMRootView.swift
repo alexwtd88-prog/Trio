@@ -92,6 +92,18 @@ extension CGMSettings {
                     }.listRowBackground(Color.chart)
                 }
 
+                Section {
+                    NavigationLink(
+                        destination: SensorHistoryView(),
+                        label: {
+                            HStack {
+                                Image(systemName: "clock.arrow.circlepath")
+                                Text("Sensor History")
+                            }
+                        }
+                    )
+                }.listRowBackground(Color.chart)
+
                 SettingInputSection(
                     decimalValue: $decimalPlaceholder,
                     booleanValue: $state.smoothGlucose,

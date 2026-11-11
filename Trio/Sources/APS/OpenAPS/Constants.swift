@@ -67,5 +67,6 @@ extension OpenAPS {
         static let settings = "freeaps/freeaps_settings.json"
         static let tempTargetsPresets = "freeaps/temptargets_presets.json"
         static let calibrations = "freeaps/calibrations.json"
+        static let sensorHistory = "freeaps/sensor_history.json"
     }
 }
